@@ -21,7 +21,7 @@ def load_csv(path: str, key_col: str = "user_id") -> dict:
         logger.error(f"File not found: {path}")
         return {}
     data = {}
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
             if key_col in row:
@@ -110,9 +110,9 @@ def analyze_errors(preds_path: str, truth_path: str, report_out_path: str = "eva
         md_lines.append("|---|---|---|")
         for err in err_list:
             u_id, t_val, p_val = err
-            # Sanitize for markdown tables
-            t_val = str(t_val).replace('|', '-') if t_val else "None"
-            p_val = str(p_val).replace('|', '-') if p_val else "None"
+            # Sanitize for markdown tables (remove pipes, newlines, and carriage returns)
+            t_val = str(t_val).replace('|', '-').replace('\n', ' ').replace('\r', '') if t_val else "None"
+            p_val = str(p_val).replace('|', '-').replace('\n', ' ').replace('\r', '') if p_val else "None"
             md_lines.append(f"| {u_id} | `{t_val}` | `{p_val}` |")
         md_lines.append("\n")
 

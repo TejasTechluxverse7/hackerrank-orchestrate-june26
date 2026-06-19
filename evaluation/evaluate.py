@@ -22,7 +22,7 @@ def load_csv(path: str, key_col: str = "user_id") -> Dict[str, dict]:
         return {}
 
     data = {}
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
             if key_col in row:
