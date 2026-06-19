@@ -1,0 +1,1 @@
+# adversarial_check.txt — Second-pass prompt for high-risk users

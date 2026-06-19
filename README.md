@@ -1,161 +1,99 @@
-# HackerRank Orchestrate
+# HackerRank Orchestrate: Damage Claim Verification Pipeline
 
-Starter repository for the **HackerRank Orchestrate** 24-hour hackathon.
+Welcome to the **HackerRank Orchestrate** challenge submission for multi-modal damage claim verification. This repository contains an automated, scalable pipeline designed to ingest noisy user claims, extract canonical evidence intents, and verify them against visual evidence requirements using a deterministic Evidence Graph.
 
-Build a system that verifies visual evidence for damage claims across three object types: **cars**, **laptops**, and **packages**.
+## Project Overview
 
-Your system will receive claim conversations, one or more submitted images, user claim history, and minimum evidence requirements. It must decide whether the submitted images support the claim, contradict it, or do not provide enough information.
+Modern insurance and return-merchandise operations are bogged down by manual visual reviews. The goal of this project is to build an intelligent, multi-modal pipeline capable of analyzing conversational customer claims, cross-referencing them against user history and evidence requirements, and rendering deterministic adjudication decisions (Accept, Reject, Manual Review).
 
-Read [`problem_statement.md`](./problem_statement.md) for the full task spec, input/output schema, and allowed values.
+## Problem Statement
 
----
+Claim processing involves reading messy, multilingual transcripts (e.g., Hinglish) and extracting structured data (claim object, specific parts, damage types). These claims must then be matched against specific regulatory requirements and evaluated for visual evidence using images. The challenge is mitigating AI hallucination while maintaining high throughput.
 
-## Contents
+## Architecture
 
-1. [Repository layout](#repository-layout)
-2. [What you need to build](#what-you-need-to-build)
-3. [Where your code goes](#where-your-code-goes)
-4. [Quickstart](#quickstart)
-5. [Evaluation](#evaluation)
-6. [Chat transcript logging](#chat-transcript-logging)
-7. [Submission](#submission)
-8. [Judge interview](#judge-interview)
+Our solution adopts a strictly pipelined architecture, separating the probabilistic LLM/VLM extraction steps from the deterministic reasoning layers.
 
----
-
-## Repository layout
-
-```text
-.
-├── AGENTS.md                         # Rules for AI coding tools + transcript logging
-├── problem_statement.md              # Full task description and I/O schema
-├── README.md                         # You are here
-├── code/                             # Build your solution here
-│   ├── main.py                       # Suggested terminal entry point
-│   └── evaluation/
-│       └── main.py                   # Suggested evaluation entry point
-└── dataset/
-    ├── sample_claims.csv             # Inputs + expected outputs for development
-    ├── claims.csv                    # Inputs only; run your system on these rows
-    ├── user_history.csv              # Historical claim counts and risk context
-    ├── evidence_requirements.csv     # Minimum image evidence requirements
-    └── images/
-        ├── sample/                   # Images referenced by sample_claims.csv
-        └── test/                     # Images referenced by claims.csv
+```mermaid
+graph TD
+    A[Claims Dataset] -->|Text| B(Module A: Claim Parser)
+    B -->|ParsedClaim| C(Module B: Context Assembler)
+    C -->|ContextBundle| D(Module D: Evidence Graph Builder)
+    
+    A -->|Images| E(Module C: VLM Image Analyzer)
+    E -->|ImageObservation| D
+    
+    D -->|EvidenceGraph| F(Module E: Decision Engine)
+    F -->|DecisionStatus| G(Module H: Self-Verifier)
+    G -->|Final Record| H[(output.csv)]
 ```
 
----
+### Multi-Agent Pipeline
 
-## What you need to build
+1. **Claim Parser**: Ingests raw dialogue, applies reverse-chronological extraction, resolves multi-lingual negation, and deduplicates canonical parts.
+2. **Context Assembler**: Hydrates the claim with user history (risk flags) and fetches specific `evidence_requirements` for the VLM step.
+3. **Image Analyzer (VLM Probe)**: A decoupled vision model that strictly extracts visual facts (visible parts, visible damage, image quality) without rendering judgments.
+4. **Decision Engine**: Reads the deterministic graph edges to assign statuses.
+5. **Self-Verifier**: A strict post-processing guardrail that asserts the final decision is logically backed by the Evidence Graph topology, forcing `manual_review_required` on failure.
 
-A system that, for each row in `dataset/claims.csv`, produces one row in `output.csv`.
+### Evidence Graph Reasoning
 
-Input fields:
+Instead of asking a VLM to "approve or reject" a claim (which leads to hallucination), we build an Evidence Graph. 
 
-| Column | Meaning |
-|---|---|
-| `user_id` | User submitting the claim; use this to look up `dataset/user_history.csv` |
-| `image_paths` | One or more submitted image paths, separated by semicolons |
-| `user_claim` | Chat transcript describing the issue |
-| `claim_object` | `car`, `laptop`, or `package` |
+Nodes consist of the Claim, Parts, Issues, and Images. Edges are drawn (e.g., `SUPPORTS`, `CONTRADICTS`, `INSUFFICIENT`). The Decision Engine evaluates the entire graph deterministically. If an image actively `CONTRADICTS` the claim, it's rejected. If the graph lacks sufficient `SUPPORTS` edges, it requests manual review.
 
-Required output fields:
+## Evaluation Strategy
 
-| Column | Meaning |
-|---|---|
-| `evidence_standard_met` | Whether the image set is sufficient to evaluate the claim |
-| `evidence_standard_met_reason` | Short reason for the evidence decision |
-| `risk_flags` | Semicolon-separated risk flags, or `none` |
-| `issue_type` | Visible issue type |
-| `object_part` | Relevant object part |
-| `claim_status` | `supported`, `contradicted`, or `not_enough_information` |
-| `claim_status_justification` | Concise explanation grounded in the image evidence |
-| `supporting_image_ids` | Image IDs supporting the decision, or `none` |
-| `valid_image` | Whether the image set is usable for automated review |
-| `severity` | `none`, `low`, `medium`, `high`, or `unknown` |
+We employ a custom, framework-independent evaluation suite (`evaluation/evaluate.py`) that computes accuracy, precision, recall, and F1-scores without relying on external libraries like `scikit-learn` (ensuring environmental consistency).
 
-Hard requirements:
+Additionally, `evaluation/error_analysis.py` categorizes pipeline failures into five distinct buckets (Damage Detection, Part Detection, Severity, Evidence Sufficiency, Risk Flags) and outputs a detailed Markdown report (`error_report.md`) to guide iteration.
 
-- Must read the provided CSV files and local images.
-- Must produce `output.csv` with the exact schema in `problem_statement.md`.
-- Must include an evaluation workflow
-- Must avoid hardcoded test labels or file-specific answers.
+## Setup Instructions
 
-Beyond that you are free to bring your own approach: VLMs, LLMs, structured prompting, rule layers, batching, caching, evaluation pipelines, model comparison, or anything else.
+1. Ensure Python 3.9+ is installed.
+2. Clone this repository.
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
----
+## Running Predictions
 
-## Where your code goes
-
-All of your work belongs in [`code/`](./code/). The repo ships with empty starter files that you can grow into your full solution.
-
-Suggested conventions:
-
-- Put your main runnable solution in `code/main.py`, or document your own entry point clearly.
-- Put evaluation code under `code/evaluation/` or an `evaluation/` folder included in your final `code.zip`.
-- Write final predictions to `output.csv`.
-
----
-
-## Quickstart
-
-Clone this repository:
+To run the pipeline and generate `output.csv`:
 
 ```bash
-git clone git@github.com:interviewstreet/hackerrank-orchestrate-june26.git
-cd hackerrank-orchestrate-june26
+python run.py
 ```
 
-You are free to use any language or runtime. Python, JavaScript, and TypeScript are all reasonable choices.
+## Running Evaluation
 
----
+To calculate F1-scores and view error analysis:
 
-## Evaluation
+```bash
+python evaluation/evaluate.py --preds output.csv --truth dataset/sample_claims.csv
+python evaluation/error_analysis.py --preds output.csv --truth dataset/sample_claims.csv
+```
 
-The evaluation report should include:
+## Project Structure
 
-- metrics on `dataset/sample_claims.csv`
-- at least two strategies, prompts, or model configurations compared
-- the final strategy used for `output.csv`
-- operational analysis covering model calls, token usage, image usage, approximate cost, runtime, and TPM/RPM considerations
-
----
-
-## Chat transcript logging
-
-This repo ships with an `AGENTS.md` that modern AI coding tools may read. It instructs the tool to append conversation turns to a shared log file:
-
-| Platform | Path |
-|---|---|
-| macOS / Linux | `$HOME/hackerrank_orchestrate/log.txt` |
-| Windows | `%USERPROFILE%\hackerrank_orchestrate\log.txt` |
-
-You will upload this log as your chat transcript at submission time. The chat transcript means your conversation with the AI coding tool you used to build the system. It is not the runtime logs, reasoning trace, or conversation history produced by the claim-verification agent you are building.
-
-If you use multiple AI tools, include the relevant conversation logs from all of them in the same transcript file. Separate each tool's section with a clear divider and label it with the tool name.
-
-Never paste secrets into the chat. If secrets are needed, use environment variables.
-
----
-
-## Submission
-
-Submit the following files as instructed by HackerRank:
-
-1. **Code zip**: zip your runnable solution, README, prompts/configs, and evaluation folder. Exclude virtualenvs, `node_modules`, build artifacts, and unnecessary generated files.
-2. **Predictions CSV**: your final `output.csv` for all rows in `dataset/claims.csv`.
-3. **Chat transcript**: the `log.txt` from the path in [Chat transcript logging](#chat-transcript-logging).
-
-Before submitting, confirm:
-
-- `output.csv` has one row per row in `dataset/claims.csv`.
-- `output.csv` has the exact required columns in the exact required order.
-- Your evaluation files are included in `code.zip`.
-
----
-
-## Judge interview
-
-After submission, the AI Judge may ask about your approach, implementation decisions, model usage, evaluation strategy, and how you used AI while building the solution.
-
-Be prepared to explain your solution in detail.
+```text
+├── code/
+│   ├── pipeline/
+│   │   ├── adjudicator.py          # Legacy rule engine (deprecated by Decision Engine)
+│   │   ├── claim_parser.py         # Module A
+│   │   ├── context_assembler.py    # Module B
+│   │   ├── decision_engine.py      # Module E (Graph-based Adjudicator)
+│   │   ├── evidence_graph.py       # Module D
+│   │   ├── evidence_retriever.py   # Context Dependency
+│   │   ├── image_analyzer.py       # Module C
+│   │   ├── risk_analyzer.py        # Context Dependency
+│   │   └── self_verifier.py        # Module H (Guardrails)
+├── dataset/                        # Input datasets
+├── docs/                           # Internal Architecture documentation
+├── evaluation/                     # Metric logic
+│   ├── evaluate.py
+│   └── error_analysis.py
+├── run.py                          # Main Orchestrator
+├── requirements.txt
+└── README.md
+```
