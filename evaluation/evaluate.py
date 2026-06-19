@@ -137,9 +137,14 @@ def evaluate(predictions_path: str, ground_truth_path: str):
 
 if __name__ == "__main__":
     import argparse
+    from pathlib import Path
+    
+    # Anchor to the project root (parent of the 'evaluation' directory)
+    project_root = Path(__file__).resolve().parent.parent
+    
     parser = argparse.ArgumentParser(description="Evaluate pipeline predictions.")
-    parser.add_argument("--preds", default="output.csv", help="Path to predictions CSV")
-    parser.add_argument("--truth", default="dataset/sample_claims.csv", help="Path to ground truth CSV")
+    parser.add_argument("--preds", default=str(project_root / "output.csv"), help="Path to predictions CSV")
+    parser.add_argument("--truth", default=str(project_root / "dataset/sample_claims.csv"), help="Path to ground truth CSV")
     
     args = parser.parse_args()
     evaluate(args.preds, args.truth)

@@ -130,10 +130,14 @@ def analyze_errors(preds_path: str, truth_path: str, report_out_path: str = "eva
 
 if __name__ == "__main__":
     import argparse
+    from pathlib import Path
+    
+    project_root = Path(__file__).resolve().parent.parent
+    
     parser = argparse.ArgumentParser(description="Generate Error Analysis Markdown Report.")
-    parser.add_argument("--preds", default="output.csv", help="Path to predictions CSV")
-    parser.add_argument("--truth", default="dataset/sample_claims.csv", help="Path to ground truth CSV")
-    parser.add_argument("--out", default="evaluation/error_report.md", help="Path to save markdown report")
+    parser.add_argument("--preds", default=str(project_root / "output.csv"), help="Path to predictions CSV")
+    parser.add_argument("--truth", default=str(project_root / "dataset/sample_claims.csv"), help="Path to ground truth CSV")
+    parser.add_argument("--out", default=str(project_root / "evaluation/error_report.md"), help="Path to save markdown report")
     
     args = parser.parse_args()
     analyze_errors(args.preds, args.truth, args.out)
